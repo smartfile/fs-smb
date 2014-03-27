@@ -7,7 +7,7 @@ from smbfs import SMBFS
 
 
 class TestSMBFS(FSTestCases, unittest.TestCase):
-    """ Unit test suite as defined within Pyfilesystem. """
+    """ Unit test suite as defined within PyFilesystem. """
     server_name = 'testserver'
     server_IP = 'test IP'
     username = 'testuser'

@@ -29,12 +29,12 @@ from fs.remote import RemoteFileBuffer
 
 
 def _conv_smb_errors(outer):
-    """ Convert Samba errors (OperationFailure) into Pyfilesystem errors. """
+    """ Convert Samba errors (OperationFailure) into PyFilesystem errors. """
     def inner(*args, **kwargs):
         try:
             return outer(*args, **kwargs)
         except OperationFailure as e:
-            # Cycle through each message and map the first one to Pyfilesystem
+            # Cycle through each message and map the first one to PyFilesystem
             # that is not a successful status (0x00000000).
             path = args[1]
             for msg in e.smb_messages:
@@ -149,7 +149,7 @@ class SMBFS(FS):
     def _listPath(self, path, pattern=None):
         """ Path listing with SMB errors converted. """
         # Explicitly convert the SMB errors to be able to catch the
-        # Pyfilesystem error while listing the path.
+        # PyFilesystem error while listing the path.
         if pattern is None:
             try:
                 # List all contents of a directory.
@@ -246,7 +246,7 @@ class SMBFS(FS):
             return False
 
     def _conv_smb_info_to_fs(self, smb_info):
-        """ Convert SMB information into Pyfilesystem info dict. """
+        """ Convert SMB information into PyFilesystem info dict. """
         return {'size': smb_info.file_size,
                 'mode': stat.S_IFDIR if smb_info.isDirectory else 0,
                 'created_time': smb_info.create_time,
@@ -263,7 +263,7 @@ class SMBFS(FS):
                 (files_only and i.isDirectory)):
                 continue
 
-            # Rely on the Pyfilesystem helper to determine if the path should
+            # Rely on the PyFilesystem helper to determine if the path should
             # be listed.  An empty listing indicates to not list the path.
             name = self._listdir_helper(path, [i.filename], wildcard, full,
                                         absolute, False, False)

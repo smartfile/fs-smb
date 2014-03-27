@@ -1,4 +1,4 @@
 fs-smb
 ======
 
-Pyfilesystem interface for SMB filesystems
+PyFilesystem interface for SMB filesystems
