@@ -3,6 +3,14 @@
 all:
 	@echo "Targets:  test, clean"
 
+install:
+	python setup.py install
+
+uninstall:
+	-pip uninstall smbfs
+	-pip uninstall pysmb
+	-pip uninstall fs
+
 test:
 	python -m unittest smbfs.tests
 
