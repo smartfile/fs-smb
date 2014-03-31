@@ -248,17 +248,17 @@ class SMBFS(FS):
 
     def _conv_smb_info_to_fs(self, smb_info):
         """ Convert SMB information into PyFilesystem info dict. """
-        st_ctime = datetime.datetime.fromtimestamp(smb_info.create_time)
-        st_atime = datetime.datetime.fromtimestamp(smb_info.last_access_time)
-        st_mtime = datetime.datetime.fromtimestamp(smb_info.last_write_time)
         return {'size': smb_info.file_size,
                 'st_mode': stat.S_IFDIR if smb_info.isDirectory else 0,
-                'created_time': st_ctime,
-                'st_ctime': st_ctime,
-                'accessed_time': st_atime,
-                'st_atime': st_atime,
-                'modified_time': st_mtime,
-                'st_mtime': st_mtime}
+                'created_time': datetime.datetime.fromtimestamp(
+                    smb_info.create_time),
+                'st_ctime': smb_info.create_time,
+                'accessed_time': datetime.datetime.fromtimestamp(
+                    smb_info.last_access_time),
+                'st_atime': smb_info.last_access_time,
+                'modified_time': datetime.datetime.fromtimestamp(
+                    smb_info.last_write_time),
+                'st_mtime': smb_info.last_write_time}
 
     def listdirinfo(self, path="./", wildcard=None, full=False, absolute=False,
                     dirs_only=False, files_only=False):
