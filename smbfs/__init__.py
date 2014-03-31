@@ -266,7 +266,8 @@ class SMBFS(FS):
     def _conv_smb_info_to_fs(self, smb_info):
         """ Convert SMB information into PyFilesystem info dict. """
         return {'size': smb_info.file_size,
-                'st_mode': stat.S_IFDIR if smb_info.isDirectory else 0,
+                'st_mode': (stat.S_IFDIR if smb_info.isDirectory else
+                            stat.S_IFREG),
                 'created_time': datetime.datetime.fromtimestamp(
                     smb_info.create_time),
                 'st_ctime': smb_info.create_time,
