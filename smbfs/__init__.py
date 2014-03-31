@@ -39,25 +39,33 @@ def _conv_smb_errors(outer):
             # that is not a successful status (0x00000000).
             path = args[1]
             for msg in e.smb_messages:
-                if msg.status.internal_value == 0x0:
+                # Protocol versions exposes the error values differently.
+                if msg.protocol == 1:
+                    msg_status = msg.status.internal_value
+                else:
+                    msg_status = msg.status
+
+                if msg_status == 0x0:
                     continue
-                if msg.status.internal_value == 0xc000000f:
+                elif msg_status == 0xc000000f:
                     raise ResourceNotFoundError(path)
-                elif msg.status.internal_value == 0xc00000ba:
+                elif msg_status == 0xc00000ba:
                     raise ResourceInvalidError(path)
-                elif msg.status.internal_value == 0xc0000034:
+                elif msg_status == 0xc0000033:
+                    raise ResourceInvalidError(path)
+                elif msg_status == 0xc0000034:
                     raise ResourceNotFoundError(path)
-                elif msg.status.internal_value == 0xc0000035:
+                elif msg_status == 0xc0000035:
                     raise DestinationExistsError(path)
-                elif msg.status.internal_value == 0xc000003a:
+                elif msg_status == 0xc000003a:
                     raise ResourceNotFoundError(path)
-                elif msg.status.internal_value == 0xc0000101:
+                elif msg_status == 0xc0000101:
                     raise DirectoryNotEmptyError(path)
-                elif msg.status.internal_value == 0xc0000103:
+                elif msg_status == 0xc0000103:
                     raise ResourceInvalidError(path)
                 else:
                     raise Exception('Unhandled SMB error:  {0}'.format(
-                        hex(msg.status.internal_value)))
+                        hex(msg_status)))
             raise
     return inner
 
