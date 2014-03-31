@@ -22,6 +22,7 @@ from fs.errors import ResourceNotFoundError
 from fs.filelike import SpooledTemporaryFile
 from fs.filelike import StringIO
 from fs.path import abspath
+from fs.path import basename
 from fs.path import dirname
 from fs.path import normpath
 from fs.path import pathjoin
@@ -155,23 +156,31 @@ class SMBFS(FS):
         self.close()
         return super(SMBFS, self).__getstate__()
 
-    def _listPath(self, path, pattern=None):
+    def _listPath(self, path, list_contents=False):
         """ Path listing with SMB errors converted. """
         # Explicitly convert the SMB errors to be able to catch the
         # PyFilesystem error while listing the path.
-        if pattern is None:
+        if list_contents:
             try:
                 # List all contents of a directory.
                 return _conv_smb_errors(self.conn.listPath)(
-                    self.share, normpath(path), pattern='*')
+                    self.share, normpath(path))
             except ResourceNotFoundError:
                 if self.isfile(path):
                     raise ResourceInvalidError(path)
                 raise
         else:
-            # List a specific path (file or directory).
-            return _conv_smb_errors(self.conn.listPath)(
-                self.share, '/', pattern=path)
+            # List a specific path (file or directory) by listing the contents
+            # of the containing directory and comparing the filename.
+            pathdir = dirname(path)
+            searchpath = basename(path)
+            for i in _conv_smb_errors(self.conn.listPath)(self.share, pathdir):
+                if i.filename == '..':
+                    continue
+                elif ((i.filename == '.' and searchpath == '') or
+                      i.filename == searchpath):
+                    return i
+            raise ResourceNotFoundError(path)
 
     @_conv_smb_errors
     def _retrieveFile(self, path, file_obj):
@@ -243,14 +252,14 @@ class SMBFS(FS):
     @_absnorm_path(1)
     def isfile(self, path):
         try:
-            return not self._listPath(path, pattern=path)[0].isDirectory
+            return not self._listPath(path).isDirectory
         except FSError:
             return False
 
     @_absnorm_path(1)
     def isdir(self, path):
         try:
-            return self._listPath(path, pattern=path)[0].isDirectory
+            return self._listPath(path).isDirectory
         except FSError:
             return False
 
@@ -271,7 +280,7 @@ class SMBFS(FS):
     def listdirinfo(self, path="./", wildcard=None, full=False, absolute=False,
                     dirs_only=False, files_only=False):
         listing = []
-        for i in self._listPath(path):
+        for i in self._listPath(path, list_contents=True):
             # Skip ., .. and undesired types.
             if (i.filename == '.' or i.filename == '..' or
                 (dirs_only and not i.isDirectory) or
@@ -350,4 +359,4 @@ class SMBFS(FS):
 
     @_absnorm_path(1)
     def getinfo(self, path):
-        return self._conv_smb_info_to_fs(self._listPath(path, pattern=path)[0])
+        return self._conv_smb_info_to_fs(self._listPath(path))
