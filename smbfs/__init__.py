@@ -8,7 +8,7 @@ import string
 from functools import wraps
 
 from smb.SMBConnection import SMBConnection
-from smb.smb_structs import OperationFailure
+from smb.base import OperationFailure
 
 from fs import iotools
 from fs.base import FS
@@ -48,10 +48,11 @@ def _conv_smb_errors(outer):
 
                 if msg_status == 0x0:
                     continue
+                elif msg_status == 0x103:
+                    # Unknown error, but message says it is not found.
+                    raise ResourceNotFoundError(path)
                 elif msg_status == 0xc000000f:
                     raise ResourceNotFoundError(path)
-                elif msg_status == 0xc00000ba:
-                    raise ResourceInvalidError(path)
                 elif msg_status == 0xc0000033:
                     raise ResourceInvalidError(path)
                 elif msg_status == 0xc0000034:
@@ -60,6 +61,10 @@ def _conv_smb_errors(outer):
                     raise DestinationExistsError(path)
                 elif msg_status == 0xc000003a:
                     raise ResourceNotFoundError(path)
+                elif msg_status == 0xc00000ba:
+                    raise ResourceInvalidError(path)
+                elif msg_status == 0xc00000d0:
+                    raise ResourceInvalidError(path)
                 elif msg_status == 0xc0000101:
                     raise DirectoryNotEmptyError(path)
                 elif msg_status == 0xc0000103:
