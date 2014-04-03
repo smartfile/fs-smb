@@ -4,6 +4,7 @@ import datetime
 import random
 import stat
 import string
+import threading
 
 from functools import wraps
 
@@ -12,6 +13,7 @@ from smb.base import OperationFailure
 
 from fs import iotools
 from fs.base import FS
+from fs.base import synchronize
 from fs.errors import DestinationExistsError
 from fs.errors import DirectoryNotEmptyError
 from fs.errors import FSError
@@ -141,14 +143,13 @@ class SMBFS(FS):
 
     def __init__(self, username, password, server_name, server_IP, share,
                  port=139, client_name=None, thread_synchronize=True):
-        super(SMBFS, self).__init__(thread_synchronize=thread_synchronize)
-        self._conn = None
         self.username = username
         self.password = password
         self.server_name = server_name
         self.share = share
         self.server_IP = server_IP
         self.port = port
+        self._tls = threading.local()
 
         # Automatically generate a client name if not provided.
         if client_name is None:
@@ -157,10 +158,18 @@ class SMBFS(FS):
         else:
             self.client_name = client_name
 
+        super(SMBFS, self).__init__(thread_synchronize=thread_synchronize)
+
     def __getstate__(self):
         # Close the connection to allow pickling.
+        state = super(SMBFS, self).__getstate__()
         self.close()
-        return super(SMBFS, self).__getstate__()
+        del state['_tls']
+        return state
+
+    def __setstate__(self, state):
+        super(SMBFS, self).__setstate__(state)
+        self._tls = threading.local()
 
     def _listPath(self, path, list_contents=False):
         """ Path listing with SMB errors converted. """
@@ -211,6 +220,7 @@ class SMBFS(FS):
         """ Remove a directory.  Convert SMB errors. """
         self.conn.deleteDirectory(self.share, path)
 
+    @synchronize
     @_conv_smb_errors
     @_absnorm_path(1)
     def setcontents(self, path, data=b'', encoding=None, errors=None,
@@ -229,16 +239,16 @@ class SMBFS(FS):
     @property
     def conn(self):
         """ Connection to server. """
-        if self._conn is None:
-            self._conn = SMBConnection(self.username, self.password,
-                                       self.client_name, self.server_name,
-                                       use_ntlm_v2=True)
-            self._conn.connect(self.server_IP, self.port)
-        return self._conn
+        if 'conn' not in self._tls.__dict__:
+            self._tls.conn = SMBConnection(
+                self.username, self.password, self.client_name,
+                self.server_name, use_ntlm_v2=True)
+            self._tls.conn.connect(self.server_IP, self.port)
+        return self._tls.conn
 
     def close(self):
         super(SMBFS, self).close()
-        self._conn = None
+        self._tls.__dict__.pop('conn', None)
 
     @iotools.filelike_to_stream
     @_absnorm_path(1)
@@ -308,6 +318,7 @@ class SMBFS(FS):
         return [name[0] for name in self.listdirinfo(
             path, wildcard, full, absolute, dirs_only, files_only)]
 
+    @synchronize
     def makedir(self, path, recursive=False, allow_recreate=False):
         # Create a directory from the top downwards depending upon the flags.
         paths = recursepath(path) if recursive else (path, )
@@ -338,6 +349,7 @@ class SMBFS(FS):
     def remove(self, path):
         self.conn.deleteFiles(self.share, path)
 
+    @synchronize
     @_conv_smb_errors
     @_absnorm_path(1)
     def removedir(self, path, recursive=False, force=False):
