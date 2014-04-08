@@ -146,7 +146,7 @@ class SMBFS(FS):
              'atomic.removedir': False,
              'atomic.rename': True,
              'atomic.setcontents': False,
-             'mime_type': 'virtual/filehub'}
+             'mime_type': 'virtual/smb'}
 
     def __init__(self, username, password, server_name, server_IP, share,
                  port=139, client_name=None,
