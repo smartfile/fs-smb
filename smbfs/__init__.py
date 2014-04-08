@@ -4,7 +4,6 @@ import datetime
 import random
 import stat
 import string
-import threading
 
 from functools import wraps
 
@@ -14,6 +13,7 @@ from smb.base import OperationFailure
 from fs import _thread_synchronize_default
 from fs import iotools
 from fs.base import FS
+from fs.base import synchronize
 from fs.errors import DestinationExistsError
 from fs.errors import DirectoryNotEmptyError
 from fs.errors import FSError
@@ -157,7 +157,7 @@ class SMBFS(FS):
         self.share = share
         self.server_IP = server_IP
         self.port = port
-        self._tls = threading.local()
+        self._conn = None
 
         # Automatically generate a client name if not provided.
         if client_name is None:
@@ -170,14 +170,8 @@ class SMBFS(FS):
 
     def __getstate__(self):
         # Close the connection to allow pickling.
-        state = super(SMBFS, self).__getstate__()
         self.close()
-        del state['_tls']
-        return state
-
-    def __setstate__(self, state):
-        super(SMBFS, self).__setstate__(state)
-        self._tls = threading.local()
+        return super(SMBFS, self).__getstate__()
 
     def _listPath(self, path, list_contents=False):
         """ Path listing with SMB errors converted. """
@@ -228,6 +222,7 @@ class SMBFS(FS):
         """ Remove a directory.  Convert SMB errors. """
         self.conn.deleteDirectory(self.share, path)
 
+    @synchronize
     @_conv_smb_errors
     @_absnorm_path(1)
     def setcontents(self, path, data=b'', encoding=None, errors=None,
@@ -244,21 +239,24 @@ class SMBFS(FS):
         self.conn.storeFile(self.share, path, data)
 
     @property
+    @synchronize
     def conn(self):
         """ Connection to server. """
-        if 'conn' not in self._tls.__dict__:
-            self._tls.conn = SMBConnection(
+        if self._conn is None:
+            self._conn = SMBConnection(
                 self.username, self.password, self.client_name,
                 self.server_name, use_ntlm_v2=True)
-            self._tls.conn.connect(self.server_IP, self.port)
-        return self._tls.conn
+            self._conn.connect(self.server_IP, self.port)
+        return self._conn
 
+    @synchronize
     def close(self):
         super(SMBFS, self).close()
-        conn = self._tls.__dict__.pop('conn', None)
-        if conn is not None:
-            conn.close()
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
 
+    @synchronize
     @iotools.filelike_to_stream
     @_absnorm_path(1)
     def open(self, path, mode='r', **kwargs):
@@ -274,6 +272,7 @@ class SMBFS(FS):
             self._retrieveFile(path, file_obj)
         return RemoteFileBuffer(self, path, mode, file_obj)
 
+    @synchronize
     @_absnorm_path(1)
     def isfile(self, path):
         try:
@@ -281,6 +280,7 @@ class SMBFS(FS):
         except FSError:
             return False
 
+    @synchronize
     @_absnorm_path(1)
     def isdir(self, path):
         try:
@@ -303,6 +303,7 @@ class SMBFS(FS):
                     smb_info.last_write_time),
                 'st_mtime': smb_info.last_write_time}
 
+    @synchronize
     def listdirinfo(self, path="./", wildcard=None, full=False, absolute=False,
                     dirs_only=False, files_only=False):
         listing = []
@@ -321,12 +322,14 @@ class SMBFS(FS):
                 listing.append((name[0], self._conv_smb_info_to_fs(i)))
         return listing
 
+    @synchronize
     def listdir(self, path="./", wildcard=None, full=False, absolute=False,
                 dirs_only=False, files_only=False):
         # Wrap whatever listdirinfo returns while discarding the info.
         return [name[0] for name in self.listdirinfo(
             path, wildcard, full, absolute, dirs_only, files_only)]
 
+    @synchronize
     def makedir(self, path, recursive=False, allow_recreate=False):
         # Create a directory from the top downwards depending upon the flags.
         paths = recursepath(path) if recursive else (path, )
@@ -352,11 +355,13 @@ class SMBFS(FS):
                 e.path = path
                 raise
 
+    @synchronize
     @_conv_smb_errors
     @_absnorm_path(1)
     def remove(self, path):
         self.conn.deleteFiles(self.share, path)
 
+    @synchronize
     @_conv_smb_errors
     @_absnorm_path(1)
     def removedir(self, path, recursive=False, force=False):
@@ -378,11 +383,13 @@ class SMBFS(FS):
         else:
             self._remove_dir(path)
 
+    @synchronize
     @_absnorm_path(2)
     @_determine_cause
     def rename(self, src, dst):
         self._rename(src, dst)
 
+    @synchronize
     @_absnorm_path(1)
     def getinfo(self, path):
         return self._conv_smb_info_to_fs(self._listPath(path))
