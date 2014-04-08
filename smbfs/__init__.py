@@ -34,7 +34,7 @@ from fs.remote import RemoteFileBuffer
 
 
 class DeletePendingError(OperationFailedError):
-    default_message = "Unable to %(opname)s: delete pending"
+    default_message = 'Unable to access %(opname)s: delete pending'
 
 
 def _conv_smb_errors(outer):
