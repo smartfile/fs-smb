@@ -11,12 +11,13 @@ from functools import wraps
 from smb.SMBConnection import SMBConnection
 from smb.base import OperationFailure
 
+from fs import _thread_synchronize_default
 from fs import iotools
 from fs.base import FS
-from fs.base import synchronize
 from fs.errors import DestinationExistsError
 from fs.errors import DirectoryNotEmptyError
 from fs.errors import FSError
+from fs.errors import OperationFailedError
 from fs.errors import ParentDirectoryMissingError
 from fs.errors import RemoveRootError
 from fs.errors import ResourceInvalidError
@@ -30,6 +31,10 @@ from fs.path import normpath
 from fs.path import pathjoin
 from fs.path import recursepath
 from fs.remote import RemoteFileBuffer
+
+
+class DeletePendingError(OperationFailedError):
+    default_message = "Unable to %(opname)s: delete pending"
 
 
 def _conv_smb_errors(outer):
@@ -63,6 +68,8 @@ def _conv_smb_errors(outer):
                     raise DestinationExistsError(path)
                 elif msg_status == 0xc000003a:
                     raise ResourceNotFoundError(path)
+                elif msg_status == 0xc0000056:
+                    raise DeletePendingError(path)
                 elif msg_status == 0xc00000ba:
                     raise ResourceInvalidError(path)
                 elif msg_status == 0xc00000d0:
@@ -142,7 +149,8 @@ class SMBFS(FS):
              'mime_type': 'virtual/filehub'}
 
     def __init__(self, username, password, server_name, server_IP, share,
-                 port=139, client_name=None, thread_synchronize=True):
+                 port=139, client_name=None,
+                 thread_synchronize=_thread_synchronize_default):
         self.username = username
         self.password = password
         self.server_name = server_name
@@ -220,7 +228,6 @@ class SMBFS(FS):
         """ Remove a directory.  Convert SMB errors. """
         self.conn.deleteDirectory(self.share, path)
 
-    @synchronize
     @_conv_smb_errors
     @_absnorm_path(1)
     def setcontents(self, path, data=b'', encoding=None, errors=None,
@@ -248,7 +255,9 @@ class SMBFS(FS):
 
     def close(self):
         super(SMBFS, self).close()
-        self._tls.__dict__.pop('conn', None)
+        conn = self._tls.__dict__.pop('conn', None)
+        if conn is not None:
+            conn.close()
 
     @iotools.filelike_to_stream
     @_absnorm_path(1)
@@ -318,7 +327,6 @@ class SMBFS(FS):
         return [name[0] for name in self.listdirinfo(
             path, wildcard, full, absolute, dirs_only, files_only)]
 
-    @synchronize
     def makedir(self, path, recursive=False, allow_recreate=False):
         # Create a directory from the top downwards depending upon the flags.
         paths = recursepath(path) if recursive else (path, )
@@ -349,7 +357,6 @@ class SMBFS(FS):
     def remove(self, path):
         self.conn.deleteFiles(self.share, path)
 
-    @synchronize
     @_conv_smb_errors
     @_absnorm_path(1)
     def removedir(self, path, recursive=False, force=False):
