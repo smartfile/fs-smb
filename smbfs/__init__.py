@@ -8,6 +8,7 @@ import string
 from functools import wraps
 
 from smb.SMBConnection import SMBConnection
+from smb.base import NotReadyError
 from smb.base import OperationFailure
 
 from fs import _thread_synchronize_default
@@ -19,6 +20,7 @@ from fs.errors import DirectoryNotEmptyError
 from fs.errors import FSError
 from fs.errors import OperationFailedError
 from fs.errors import ParentDirectoryMissingError
+from fs.errors import RemoteConnectionError
 from fs.errors import RemoveRootError
 from fs.errors import ResourceInvalidError
 from fs.errors import ResourceNotFoundError
@@ -38,7 +40,7 @@ class DeletePendingError(OperationFailedError):
 
 
 def _conv_smb_errors(outer):
-    """ Convert Samba errors (OperationFailure) into PyFilesystem errors. """
+    """ Convert Samba errors into PyFilesystem errors. """
     def inner(*args, **kwargs):
         try:
             return outer(*args, **kwargs)
@@ -82,6 +84,9 @@ def _conv_smb_errors(outer):
                     raise Exception('Unhandled SMB error:  {0}'.format(
                         hex(msg_status)))
             raise
+        except NotReadyError as e:
+            # Not authorized.
+            raise RemoteConnectionError(str(e))
     return inner
 
 
