@@ -49,7 +49,7 @@ def _conv_smb_errors(outer):
             # that is not a successful status (0x00000000).
             path = args[1]
             for msg in e.smb_messages:
-                # Protocol versions exposes the error values differently.
+                # Protocol versions expose the error values differently.
                 if msg.protocol == 1:
                     msg_status = msg.status.internal_value
                 else:
