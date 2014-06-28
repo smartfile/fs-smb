@@ -20,6 +20,7 @@ from fs.errors import DirectoryNotEmptyError
 from fs.errors import FSError
 from fs.errors import OperationFailedError
 from fs.errors import ParentDirectoryMissingError
+from fs.errors import PermissionDeniedError
 from fs.errors import RemoteConnectionError
 from fs.errors import RemoveRootError
 from fs.errors import ResourceInvalidError
@@ -62,6 +63,8 @@ def _conv_smb_errors(outer):
                     raise ResourceNotFoundError(path)
                 elif msg_status == 0xc000000f:
                     raise ResourceNotFoundError(path)
+                elif msg_status == 0xc0000022:
+                    raise PermissionDeniedError(path)
                 elif msg_status == 0xc0000033:
                     raise ResourceInvalidError(path)
                 elif msg_status == 0xc0000034:
