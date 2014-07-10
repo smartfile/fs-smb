@@ -36,8 +36,37 @@ from fs.path import recursepath
 from fs.remote import RemoteFileBuffer
 
 
+# Override the default message to display the operation and path together.
+PermissionDeniedError.default_message = (
+    'Unable to %(opname)s %(path)s: permission denied')
+
+
+class AccountError(PermissionDeniedError):
+    """ Base error for issues with an authenticated account. """
+
+
+class AccountExpiredError(AccountError):
+    default_message = 'Account expired'
+
+
+class AccountLockedError(AccountError):
+    default_message = 'Account locked'
+
+
+class AccountTimeRestrictedError(AccountError):
+    default_message = 'Account restricted from access at this time'
+
+
 class DeletePendingError(OperationFailedError):
-    default_message = 'Unable to access %(opname)s: delete pending'
+    default_message = 'Unable to access %(path)s: delete pending'
+
+
+class PasswordChangeRequiredError(AccountError):
+    default_message = 'Password change required'
+
+
+class PasswordExpiredError(AccountError):
+    default_message = 'Password expired'
 
 
 def _conv_smb_errors(outer):
@@ -60,29 +89,39 @@ def _conv_smb_errors(outer):
                     continue
                 elif msg_status == 0x103:
                     # Unknown error, but message says it is not found.
-                    raise ResourceNotFoundError(path)
+                    raise ResourceNotFoundError(path=path)
                 elif msg_status == 0xc000000f:
-                    raise ResourceNotFoundError(path)
+                    raise ResourceNotFoundError(path=path)
                 elif msg_status == 0xc0000022:
-                    raise PermissionDeniedError(path)
+                    raise PermissionDeniedError('access', path=path)
                 elif msg_status == 0xc0000033:
-                    raise ResourceInvalidError(path)
+                    raise ResourceInvalidError(path=path)
                 elif msg_status == 0xc0000034:
-                    raise ResourceNotFoundError(path)
+                    raise ResourceNotFoundError(path=path)
                 elif msg_status == 0xc0000035:
-                    raise DestinationExistsError(path)
+                    raise DestinationExistsError(path=path)
                 elif msg_status == 0xc000003a:
-                    raise ResourceNotFoundError(path)
+                    raise ResourceNotFoundError(path=path)
                 elif msg_status == 0xc0000056:
-                    raise DeletePendingError(path)
+                    raise DeletePendingError(path=path)
+                elif msg_status == 0xc000006f:
+                    raise AccountTimeRestrictedError(path=path)
+                elif msg_status == 0xc0000071:
+                    raise PasswordExpiredError(path=path)
                 elif msg_status == 0xc00000ba:
-                    raise ResourceInvalidError(path)
+                    raise ResourceInvalidError(path=path)
                 elif msg_status == 0xc00000d0:
-                    raise ResourceInvalidError(path)
+                    raise ResourceInvalidError(path=path)
                 elif msg_status == 0xc0000101:
-                    raise DirectoryNotEmptyError(path)
+                    raise DirectoryNotEmptyError(path=path)
                 elif msg_status == 0xc0000103:
-                    raise ResourceInvalidError(path)
+                    raise ResourceInvalidError(path=path)
+                elif msg_status == 0xc0000193:
+                    raise AccountExpiredError(path=path)
+                elif msg_status == 0xc0000224:
+                    raise PasswordChangeRequiredError(path=path)
+                elif msg_status == 0xc0000234:
+                    raise AccountLockedError(path=path)
                 else:
                     raise Exception('Unhandled SMB error:  {0}'.format(
                         hex(msg_status)))
