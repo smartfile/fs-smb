@@ -1,6 +1,7 @@
 """ Filesystem to access SMB servers.
 """
 import datetime
+import errno
 import random
 import stat
 import string
@@ -74,6 +75,10 @@ def _conv_smb_errors(outer):
     def inner(*args, **kwargs):
         try:
             return outer(*args, **kwargs)
+        except IOError as e:
+            if e.errno == errno.EPIPE:
+                raise RemoteConnectionError(str(e), details=e)
+            raise
         except OperationFailure as e:
             # Cycle through each message and map the first one to PyFilesystem
             # that is not a successful status (0x00000000).
@@ -287,6 +292,7 @@ class SMBFS(FS):
 
     @property
     @synchronize
+    @_conv_smb_errors
     def conn(self):
         """ Connection to server. """
         if self._conn is None:
