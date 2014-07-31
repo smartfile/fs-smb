@@ -82,6 +82,7 @@ def _conv_smb_errors(outer):
         except OperationFailure as e:
             # Cycle through each message and map the first one to PyFilesystem
             # that is not a successful status (0x00000000).
+            share = args[0]
             path = args[1]
             for msg in e.smb_messages:
                 # Protocol versions expose the error values differently.
@@ -115,6 +116,9 @@ def _conv_smb_errors(outer):
                     raise PasswordExpiredError(path=path)
                 elif msg_status == 0xc00000ba:
                     raise ResourceInvalidError(path=path)
+                elif msg_status == 0xc00000cc:
+                    # Share does not exist.
+                    raise ResourceInvalidError(path=share)
                 elif msg_status == 0xc00000d0:
                     raise ResourceInvalidError(path=path)
                 elif msg_status == 0xc0000101:
