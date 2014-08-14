@@ -3,12 +3,14 @@
 import datetime
 import errno
 import random
+import socket
 import stat
 import string
 
 from functools import wraps
 
 from smb.SMBConnection import SMBConnection
+from smb.base import NotConnectedError
 from smb.base import NotReadyError
 from smb.base import OperationFailure
 
@@ -75,8 +77,12 @@ def _conv_smb_errors(outer):
     def inner(*args, **kwargs):
         try:
             return outer(*args, **kwargs)
-        except IOError as e:
-            if e.errno == errno.EPIPE:
+        except socket.gaierror as e:
+            if e.errno == socket.EAI_NONAME:
+                raise RemoteConnectionError(str(e), details=e)
+            raise
+        except socket.error as e:
+            if e.errno in (errno.ECONNREFUSED, errno.EPIPE):
                 raise RemoteConnectionError(str(e), details=e)
             raise
         except OperationFailure as e:
@@ -135,9 +141,14 @@ def _conv_smb_errors(outer):
                     raise Exception('Unhandled SMB error:  {0}'.format(
                         hex(msg_status)))
             raise
+        except NotConnectedError as e:
+            # Connection does not exist or was disconnected.  Using the wrong
+            # NetBIOS name can cause this against a Windows server while Samba
+            # will ignore it.
+            raise RemoteConnectionError(details=e)
         except NotReadyError as e:
-            # Not authorized.
-            raise RemoteConnectionError(str(e))
+            # Connection has not been successfully authenticated.
+            raise RemoteConnectionError(details=e)
     return inner
 
 
