@@ -82,7 +82,7 @@ def _conv_smb_errors(outer):
                 raise RemoteConnectionError(str(e), details=e)
             raise
         except socket.error as e:
-            if e.errno in (errno.ECONNREFUSED, errno.EPIPE):
+            if e.errno in (errno.ECONNREFUSED, errno.EPIPE, errno.ETIMEDOUT):
                 raise RemoteConnectionError(str(e), details=e)
             raise
         except OperationFailure as e:
