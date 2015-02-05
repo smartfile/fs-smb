@@ -10,7 +10,7 @@ with open(os.path.join(os.path.dirname(__file__), readme_file)) as f:
 
 setup(
     name='smbfs',
-    version='0.1',
+    version='0.2',
     packages=['smbfs'],
     description='A PyFilesystem backend for SMB shares.',
     long_description=long_description,
