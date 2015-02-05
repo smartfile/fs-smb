@@ -157,6 +157,7 @@ def _determine_cause(outer):
 
         The error raised by pysmb does not report which path is the cause.
     """
+    @wraps(outer)
     def inner(*args, **kwargs):
         try:
             return outer(*args, **kwargs)
