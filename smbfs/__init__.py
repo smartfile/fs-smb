@@ -74,6 +74,7 @@ class PasswordExpiredError(AccountError):
 
 def _conv_smb_errors(outer):
     """ Convert Samba errors into PyFilesystem errors. """
+    @wraps(outer)
     def inner(*args, **kwargs):
         try:
             return outer(*args, **kwargs)
