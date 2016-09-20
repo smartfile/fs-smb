@@ -146,10 +146,11 @@ def _conv_smb_errors(outer):
             # Connection does not exist or was disconnected.  Using the wrong
             # NetBIOS name can cause this against a Windows server while Samba
             # will ignore it.
-            raise RemoteConnectionError(details=e)
+            raise RemoteConnectionError("Disconnected from the SMB server. "
+                                        "Check the NetBIOS name.", details=e)
         except NotReadyError as e:
             # Connection has not been successfully authenticated.
-            raise RemoteConnectionError(details=e)
+            raise RemoteConnectionError(str(e), details=e)
     return inner
 
 
