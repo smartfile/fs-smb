@@ -200,6 +200,22 @@ def _absnorm_path(num_paths):
     return inner_1
 
 
+class AbstractCacheBackend(object):
+    """AbstractCacheBackend base class for caching."""
+
+    def set(self, key, value, timeout):
+        pass
+
+    def get(self, key):
+        pass
+
+    def set_many(self, items, timeout):
+        pass
+
+    def get_many(self, keys):
+        pass
+
+
 class SMBFS(FS):
     """ Filesystem stored on a SMB share.
 
@@ -219,7 +235,7 @@ class SMBFS(FS):
              'mime_type': 'virtual/smb'}
 
     def __init__(self, username, password, server_name, server_IP, share,
-                 port=139, client_name=None,
+                 port=139, client_name=None, cache=AbstractCacheBackend(),
                  thread_synchronize=_thread_synchronize_default):
         self.username = username
         self.password = password
@@ -228,6 +244,8 @@ class SMBFS(FS):
         self.server_IP = server_IP
         self.port = port
         self._conn = None
+
+        self._cache = cache
 
         # Automatically generate a client name if not provided.
         if client_name is None:
@@ -245,13 +263,39 @@ class SMBFS(FS):
 
     def _listPath(self, path, list_contents=False):
         """ Path listing with SMB errors converted. """
+
         # Explicitly convert the SMB errors to be able to catch the
         # PyFilesystem error while listing the path.
         if list_contents:
+
             try:
                 # List all contents of a directory.
-                return _conv_smb_errors(self.conn.listPath)(
+
+                results = _conv_smb_errors(self.conn.listPath)(
                     self.share, normpath(path))
+
+                bulk_cache_items = {}
+
+                for result in results:
+                    if result.filename == '..':
+                        continue
+                    if result.filename == '.':
+                        continue
+
+                    folder = path
+                    if path == '':
+                        folder = "/"
+
+                    cache_key = "smbcache%s%s%s%s%s%s%s" % (
+                        self.username, self.server_name, self.share,
+                        self.server_IP, self.share,
+                        pathjoin(dirname(folder), basename(result.filename)),
+                        False)
+                    bulk_cache_items[str(cache_key)] = result
+
+                # Set cache for each item in the directory
+                self._cache.set_many(bulk_cache_items, 60)
+                return results
             except ResourceNotFoundError:
                 if self.isfile(path):
                     raise ResourceInvalidError(path)
@@ -261,12 +305,37 @@ class SMBFS(FS):
             # of the containing directory and comparing the filename.
             pathdir = dirname(path)
             searchpath = basename(path)
-            for i in _conv_smb_errors(self.conn.listPath)(self.share, pathdir):
+
+            cache_key = "smbcache%s%s%s%s%s%s%s" % (
+                self.username, self.server_name, self.share, self.server_IP,
+                self.share, pathjoin(pathdir, searchpath), False)
+            cache_read = self._cache.get(str(cache_key))
+
+            if cache_read:
+                return cache_read
+
+            results = _conv_smb_errors(self.conn.listPath)(self.share, pathdir)
+
+            bulk_cache_items = {}
+
+            for i in results:
                 if i.filename == '..':
                     continue
                 elif ((i.filename == '.' and searchpath == '') or
                       i.filename == searchpath):
+                    self._cache.set_many(bulk_cache_items, 60)
                     return i
+
+                cache_key = "smbcache%s%s%s%s%s%s%s" % (
+                    self.username, self.server_name, self.share,
+                    self.server_IP, self.share,
+                    pathjoin(pathdir, basename(i.filename)), False)
+
+                bulk_cache_items[str(cache_key)] = i
+
+            # Set cache for each item in the directory
+            self._cache.set_many(bulk_cache_items, 60)
+
             raise ResourceNotFoundError(path)
 
     @_conv_smb_errors
