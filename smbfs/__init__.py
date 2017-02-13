@@ -318,13 +318,14 @@ class SMBFS(FS):
 
             bulk_cache_items = {}
 
+            result = None
+
             for i in results:
                 if i.filename == '..':
                     continue
                 elif ((i.filename == '.' and searchpath == '') or
                       i.filename == searchpath):
-                    self._cache.set_many(bulk_cache_items, 60)
-                    return i
+                    result = i
 
                 cache_key = "smbcache%s%s%s%s%s%s%s" % (
                     self.username, self.server_name, self.share,
@@ -335,6 +336,9 @@ class SMBFS(FS):
 
             # Set cache for each item in the directory
             self._cache.set_many(bulk_cache_items, 60)
+
+            if result:
+                return result
 
             raise ResourceNotFoundError(path)
 
