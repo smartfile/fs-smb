@@ -502,7 +502,7 @@ class SMBFS(FS):
     @synchronize
     @_conv_smb_errors
     @_absnorm_path(1)
-    def remove(self, path):
+    def remove(self, path, **kwargs):
         self.conn.deleteFiles(self.share, path)
 
     @synchronize
