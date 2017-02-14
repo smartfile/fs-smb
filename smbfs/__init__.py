@@ -369,7 +369,7 @@ class SMBFS(FS):
     @_conv_smb_errors
     @_absnorm_path(1)
     def setcontents(self, path, data=b'', encoding=None, errors=None,
-                    chunk_size=1024 * 64):
+                    chunk_size=1024 * 64, **kwargs):
         # Remove then write contents.  There is no method to erase the contents
         # of a file when writing to it using pysmb.
         try:
