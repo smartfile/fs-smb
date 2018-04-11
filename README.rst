@@ -3,6 +3,8 @@ fs-smb
 
 PyFilesystem interface for SMB filesystems
 
+Note: This is for pyfilesystem2 only.
+
 
 Running Locally:
 
