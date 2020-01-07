@@ -250,7 +250,7 @@ class SMBFS(FS):
         # Automatically generate a client name if not provided.
         if client_name is None:
             self.client_name = 'fs{0}'.format(''.join(random.choice(
-                string.uppercase + string.digits) for i in range(12)))
+                string.ascii_uppercase + string.digits) for i in range(12)))
         else:
             self.client_name = client_name
 
